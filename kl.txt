@@ -1,0 +1,501 @@
+rm(list=ls())
+library(BB)
+
+th0E2 <- c(7.4253, 4.6808, 3.0581, 0.9636) 
+s0E2 <- c(0.1298 , 0.2724,  0.2815, 0.0191) 
+th1E2 <- c(6.9897, 3.9799, 3.7380, 0.8737) 
+s1E2 <- c(1.3406, 1.0403, 0.7218, 0.1123) 
+
+
+# the standard deviation sigma hat justified in the paper 
+sigh <- 0.5128   # residual standard error computed from using nls function to log combined model in 120 original data 
+#sigh <- 0.1870716
+
+
+
+epsilon <- 0.02
+# the design space
+#XE2 <-cbind(0.003:30.003 %x% rep(1, 31), 0.003:30.003) # zeros are replaced by epsilon
+x1 <- c(epsilon,1:30)
+x2 <- 0:60
+XE2 <- expand.grid(x1,x2)
+
+
+
+
+##################################################################################################################
+od_delta_KL_Example2 <- function(th0, th0l, th0u, th1, th1l, th1u, X, n, t.max=60) {
+  
+  # The KL-exchange algorithm for computing delta-optimal designs for Example 2
+  #
+  # Arguments:
+  # th0 ... the nominal value of theta_0 (a 3D vector)
+  # th0l, th0u ... 3D vectors representing the lower and upper bounds for theta_0
+  # th1 ... the nominal value of theta_1 (a 3D vector)
+  # th1l, th1u ... 3D vectors representing the lower and upper bounds for theta_1
+  # X ... the N x 2 matrix, the N-point discretization of the 2D design space
+  # n ... the required size of the experiment (the number of observations)
+  # t.max ... the computation time
+  
+  # The size of the design space   
+  N <- nrow(X)
+  
+  # Calculate F0, F1, a0, a1 for all design points
+  F0.full <- matrix(0, nrow = N, ncol = 4)
+  a0.full <- rep(0, N)
+  F1.full <- matrix(0, nrow = N, ncol = 4)
+  a1.full <- rep(0, N)
+  
+  for (i in 1:N) {
+    x1 <- X[i, 1]
+    x2 <- X[i, 2]
+    
+    a <- th0[1] * x1 
+    b <- 1 + x2 / th0[3]
+    d <- 1+((1-th0[4])*x2/th0[3])
+    e <- (th0[2] * b) + (x1 * d)
+    F0.full[i, 1] <- x1 / e
+    F0.full[i, 2] <- -(a*b)/ (e^2)
+    F0.full[i, 3] <- a * ( (th0[2] * x2 / (th0[3]^2)) + ((1-th0[4])*x1*x2/(th0[3]^2)) ) / (e^2)
+    F0.full[i, 4] <- a*x1*x2 / ((e^2) * th0[3])
+    a0.full[i] <- a / e - sum(F0.full[i,] * th0)
+    
+    a <- log(th1[1] * x1) 
+    b <- 1 + x2 / th1[3]
+    d <- 1+((1-th1[4])*x2/th1[3])
+    e <-  th1[2]*b + x1*d
+    F1.full[i, 1] <- 1 / th1[1]
+    F1.full[i, 2] <- -b / e
+    F1.full[i, 3] <- ( (th1[2] * x2 / (th1[3]^2)) + ((1-th1[4])*x1*x2/(th1[3]^2)) ) / e
+    F1.full[i, 4] <- x1*x2 / (th1[3] * e)
+    a1.full[i] <- a - log(e) - sum(F1.full[i,] * th1)
+  }
+  
+  # The square of the delta-criterion for the design given by weights w
+  crit_delta_sq <- function(w) 
+  {
+    sel <- rep(1:N, w)
+    F0 <- F0.full[sel,]; F1 <- F1.full[sel,]
+    a0 <- a0.full[sel]; a1 <- a1.full[sel]
+    r <- bvls::bvls(cbind(F0, -F1), a1 - a0, c(th0l, th1l), c(th0u, th1u))$deviance
+    #if (is.na(r))
+    # r <- -Inf
+    #r
+  }
+  
+  start <- as.numeric(proc.time()[3])
+  info <- paste("Running od_delta_KL_Example2 for cca", t.max, "seconds")
+  info <- paste(info, " starting at ", Sys.time(), ".", sep = "")
+  print(info, quote = FALSE)
+  
+  next.sec <- 0
+  n.ex <- 0
+  n.rest <- 0
+  
+  finish.all <- FALSE
+  crit.best <- -1
+  
+  while (!finish.all) {
+    n.rest <- n.rest + 1
+    w <- rep(0, N)
+    for (k in 1:n) {
+      i <- sample(1:N, 1)
+      w[i] <- w[i] + 1
+    }
+    crit.w <- crit_delta_sq(w)
+    
+    finish.all <- finish <- as.numeric(proc.time()[3]) > start + t.max
+    while (!finish) {
+      tm <- as.numeric(proc.time()[3]) - start
+      if (tm > next.sec) {
+        info <- paste("Time:", round(tm, 1), "secs, Best value:", crit.best)
+        print(info, quote = FALSE)
+        next.sec <- ceiling(tm)
+      }
+      
+      non.supp <- w < 1e-09
+      Kd.fun <- runif(N)
+      Kd.fun[non.supp] <- Inf
+      Kord <- order(Kd.fun)
+      Kact <- N - sum(non.supp)
+      Kind <- Kord[1:Kact]
+      Lind <- sample(1:N)
+      
+      imp <- FALSE
+      for (iL in Lind) {
+        for (iK in Kind) {
+          w.temp <- w
+          w.temp[iL] <- w[iL] + 1
+          w.temp[iK] <- w[iK] - 1
+          crit.temp <- crit_delta_sq(w.temp)
+          #print(crit.w)
+          #print(crit.temp)
+          if (crit.temp > crit.w + 1e-12) {
+            w <- w.temp
+            crit.w <- crit.temp
+            n.ex <- n.ex + 1
+            imp <- TRUE
+            break
+          }
+        }
+        if (imp) break
+      }
+      
+      if (as.numeric(proc.time()[3]) > start + t.max) finish.all <- TRUE
+      if (finish.all || !imp) finish <- TRUE
+    }
+    
+    if (crit.w > crit.best) {
+      w.best <- w
+      crit.best <- crit.w
+    }
+    
+    plot(X[, 1], X[, 2], type = "n", main = paste("Best design after restart no.", n.rest)); grid()
+    points(X[as.logical(w.best), 1], X[as.logical(w.best), 2], pch = 19,
+           cex = sqrt(w.best[as.logical(w.best)]))
+  }
+  
+  t.act <- round(as.numeric(proc.time()[3]) - start, 2)
+  info <- paste("od_delta_KL_Example2 finished after", t.act, "seconds at", Sys.time())
+  print(info, quote = FALSE)
+  
+  info <- paste("with", n.rest, "restarts and", n.ex, "exchanges.")
+  print(info, quote = FALSE)
+  
+  plot(X[, 1], X[, 2], type = "n", main = "Best design found"); grid()
+  points(X[as.logical(w.best),1], X[as.logical(w.best),2], pch = 19, 
+         cex = sqrt(w.best[as.logical(w.best)]))
+  
+  # Output values: 
+  # w.best ... the weights of the best design found
+  # xi.best ... the best design found
+  # delta.sq.best ... the criterion value of xi.best
+  # t.act ... the actual computation time
+  
+  X.design <- cbind(X,w.best)
+  w.pos=which(X.design[,3]>0)
+  design.best <- X.design[w.pos,]
+  
+  list(w.best = w.best, xi.best = X[rep(1:N, w.best),],
+       delta.sq.best = crit.best, t.act = t.act, design.best=design.best)
+}
+
+# The last 3 panels of Figure 4 are the designs based on the new methodology
+# Compute and plot the designs delta1, delta2, delta3
+# Notes: The designs are plotted inside of the optimization procedure. Takes 3x2 minutes.
+###########################################################################
+f1=function(xv,yv,r1){
+  exp(log(xv)-(r1*(yv/xv)))
+}
+
+f2=function(xv,yv,r2){
+  exp(log(xv)+(r2*(yv/xv)))
+}
+#------------------------------------------------------------------------
+f3=function(xv,yv,r1){
+  exp(log(xv/(1-xv))-(r1*(yv/(xv*(1-xv)))))/(1+exp(log(xv/(1-xv))-(r1*(yv/(xv*(1-xv))))))
+}
+
+f4=function(xv,yv,r2){
+  exp(log(xv/(1-xv))+(r2*(yv/(xv*(1-xv)))))/(1+exp(log(xv/(1-xv))+(r2*(yv/(xv*(1-xv))))))
+}
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+METHOD1=function(a1,a2,rv){
+  lower1=a1- rv*a2
+  upper1=a1+ rv*a2
+  for(i in 1:length(a1)){
+    #--------------------------
+    if(lower1[i]<0){
+      lower1[i]=0
+    }else{
+      lower1[i]=lower1[i]
+    }
+    #--------------------------
+    if(upper1[i]>1&i==4){
+      upper1[i]=upper1[i]-(upper1[i]-1)
+    }else{
+      upper1[i]=upper1[i]
+    }
+    #--------------------------
+    
+  }
+  list(lower1=lower1,upper1=upper1)
+}
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+METHOD2=function(a1,a2,rv){
+  lower2=a1- rv*a2
+  upper2=a1+ rv*a2
+  for(i in 1:length(a1)){
+    #--------------------------
+    if(lower2[i]<0){
+      upper2[i]=upper2[i]-lower2[i]
+      lower2[i]=0
+    }else{
+      upper2[i]=upper2[i]
+      lower2[i]=lower2[i]
+    }
+    
+    #--------------------------
+    if(upper2[i]>1&i==4){
+      upper2[i]=upper2[i]-(upper2[i]-1)
+    }else{
+      upper2[i]=upper2[i]
+    }
+    #--------------------------
+  }
+  list(lower2=lower2,upper2=upper2)
+}
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+METHOD3=function(a1,a2,rv){
+  lower3=a1- rv*a2
+  upper3=a1+ rv*a2
+  for(i in 1:length(a1)){
+    #--------------------------------------
+    if(i<=3){
+      if(lower3[i]<0){
+        lower3[i]=f1(a1[i],a2[i],rv)
+        upper3[i]=f2(a1[i],a2[i],rv)
+      }else{
+        upper3[i]=upper3[i]
+        lower3[i]=lower3[i]
+      }
+    }
+    #----------------------------
+    if(i==4){
+      if(lower3[i]<0|upper3[i]>1){
+        lower3[i]=f3(a1[i],a2[i],rv)
+        upper3[i]=f4(a1[i],a2[i],rv)
+      }else{
+        upper3[i]=upper3[i]
+        lower3[i]=lower3[i]
+      }
+    }
+  }
+  list(lower3=lower3,upper3=upper3)
+}
+
+###########################################################################
+par(mfrow=c(1,1))
+
+set.seed(123456789) 
+delta1 <- od_delta_KL_Example2(th0E2, th0E2 - s0E2, th0E2 + s0E2, 
+                               th1E2, th1E2 - s1E2, th1E2 + s1E2, XE2, n = 10, t.max = 120)
+#------------------------------------------------------------------------------------
+#set.seed(123456789) #delta1,delta2,delta3 same designs
+#delta2 <- od_delta_KL_Example2(th0E2, th0E2 - 2*s0E2, th0E2 + 2*s0E2, 
+#                               th1E2, th1E2 - 2*s1E2, th1E2 + 2*s1E2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method1
+delta2 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,2)$lower1, METHOD1(th0E2,s0E2,2)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,2)$lower1, METHOD1(th1E2,s1E2,2)$upper1, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method2
+delta21 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,2)$lower2, METHOD2(th0E2,s0E2,2)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,2)$lower2, METHOD2(th1E2,s1E2,2)$upper2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method3
+delta22 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,2)$lower3, METHOD3(th0E2,s0E2,2)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,2)$lower3, METHOD3(th1E2,s1E2,2)$upper3, XE2, n = 10, t.max = 120)
+
+
+#------------------------------------------------------------------------------------
+#set.seed(123456789) #delta1,delta2,delta3 same designs
+#delta3 <- od_delta_KL_Example2(th0E2, th0E2 - 3*s0E2, th0E2 + 3*s0E2, 
+#                               th1E2, th1E2 - 3*s1E2, th1E2 + 3*s1E2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method1
+delta3 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,3)$lower1, METHOD1(th0E2,s0E2,3)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,3)$lower1, METHOD1(th1E2,s1E2,3)$upper1, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method2
+delta31 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,3)$lower2, METHOD2(th0E2,s0E2,3)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,3)$lower2, METHOD2(th1E2,s1E2,3)$upper2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789) #method3
+delta32 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,3)$lower3, METHOD3(th0E2,s0E2,3)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,3)$lower3, METHOD3(th1E2,s1E2,3)$upper3, XE2, n = 10, t.max = 120)
+#------------------------------------------------------------------------------------
+#set.seed(123456789)
+#delta4 <- od_delta_KL_Example2(th0E2, th0E2 - 4*s0E2, th0E2 + 4*s0E2, 
+#                               th1E2, th1E2 - 4*s1E2, th1E2 + 4*s1E2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789)
+delta4 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,4)$lower1, METHOD1(th0E2,s0E2,4)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,4)$lower1, METHOD1(th1E2,s1E2,4)$upper1, XE2, n = 10, t.max = 120)
+
+set.seed(123456789)
+delta41 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,4)$lower2, METHOD2(th0E2,s0E2,4)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,4)$lower2, METHOD2(th1E2,s1E2,4)$upper2, XE2, n = 10, t.max = 120)
+
+
+set.seed(123456789)
+delta42 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,4)$lower3, METHOD3(th0E2,s0E2,4)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,4)$lower3, METHOD3(th1E2,s1E2,4)$upper3, XE2, n = 10, t.max = 120)
+
+
+#------------------------------------------------------------------------------------
+#set.seed(123456789)
+#.delta5 <- od_delta_KL_Example2(th0E2, th0E2 - 5*s0E2, th0E2 + 5*s0E2, 
+#                                   th1E2, th1E2 - 5*s1E2, th1E2 + 5*s1E2, XE2, n = 10, t.max = 120)$xi.best
+
+set.seed(123456789)
+delta5 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,5)$lower1, METHOD1(th0E2,s0E2,5)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,5)$lower1, METHOD1(th1E2,s1E2,5)$upper1, XE2, n = 10, t.max = 120)
+
+#we add the same value to the upper bound, for the estimate which was negative
+set.seed(123456789) 
+delta51 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,5)$lower2, METHOD2(th0E2,s0E2,5)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,5)$lower2, METHOD2(th1E2,s1E2,5)$upper2, XE2, n = 10, t.max = 120)
+
+#compute exp,logarithmic transformations for the second parameter
+set.seed(123456789)
+delta52 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,5)$lower3, METHOD3(th0E2,s0E2,5)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,5)$lower3, METHOD3(th1E2,s1E2,5)$upper3, XE2, n = 10, t.max = 120)
+
+#------------------------------------------------------------------------------------
+#set.seed(123456789)
+#des.delta6 <- od_delta_KL_Example2(th0E2, th0E2 - 10*s0E2, th0E2 + 10*s0E2, 
+#                                   th1E2, th1E2 - 10*s1E2, th1E2 + 10*s1E2, XE2, n = 10, t.max = 120)$xi.best
+
+set.seed(123456789)
+delta6 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,10)$lower1, METHOD1(th0E2,s0E2,10)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,10)$lower1, METHOD1(th1E2,s1E2,10)$upper1, XE2, n = 10, t.max = 120)
+
+#we add the same value to the upper bound, for the estimate which was negative
+set.seed(123456789)
+delta61 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,10)$lower2, METHOD2(th0E2,s0E2,10)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,10)$lower2, METHOD2(th1E2,s1E2,10)$upper2, XE2, n = 10, t.max = 120)
+
+#compute exp,logarithmic transformations for whole estimates of the model,whole are negative
+set.seed(123456789)
+delta62 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,10)$lower3, METHOD3(th0E2,s0E2,10)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,10)$lower3, METHOD3(th1E2,s1E2,10)$upper3, XE2, n = 10, t.max = 120)
+#------------------------------------------------------------------------------------
+
+#set.seed(123456789)
+#.delta7 <- od_delta_KL_Example2(th0E2, th0E2 - 15*s0E2, th0E2 + 15*s0E2, 
+#                                   th1E2, th1E2 - 15*s1E2, th1E2 + 15*s1E2, XE2, n = 10, t.max = 120)
+
+set.seed(123456789)
+delta7 <- od_delta_KL_Example2(th0E2, METHOD1(th0E2,s0E2,15)$lower1, METHOD1(th0E2,s0E2,15)$upper1, 
+                               th1E2, METHOD1(th1E2,s1E2,15)$lower1, METHOD1(th1E2,s1E2,15)$upper1, XE2, n = 10, t.max = 120)
+
+#we add the same value to the upper bound, for the estimate which was negative
+set.seed(123456789)
+delta71 <- od_delta_KL_Example2(th0E2, METHOD2(th0E2,s0E2,15)$lower2, METHOD2(th0E2,s0E2,15)$upper2, 
+                                th1E2, METHOD2(th1E2,s1E2,15)$lower2, METHOD2(th1E2,s1E2,15)$upper2, XE2, n = 10, t.max = 120)
+
+#compute exp,logarithmic transformations for whole estimates of the model,whole are negative
+set.seed(123456789)
+delta72 <- od_delta_KL_Example2(th0E2, METHOD3(th0E2,s0E2,15)$lower3, METHOD3(th0E2,s0E2,15)$upper3, 
+                                th1E2, METHOD3(th1E2,s1E2,15)$lower3, METHOD3(th1E2,s1E2,15)$upper3, XE2, n = 10, t.max = 120)
+
+
+###############################################################################
+des.delta1<-delta1$xi.best
+
+des.delta2<-delta2$xi.best
+des.delta21<-delta21$xi.best
+des.delta22<-delta22$xi.best
+
+
+des.delta3<-delta3$xi.best
+des.delta31<-delta31$xi.best
+des.delta32<-delta32$xi.best
+
+
+des.delta4<-delta4$xi.best
+des.delta41<-delta41$xi.best
+des.delta42<-delta42$xi.best
+
+des.delta5<-delta5$xi.best
+des.delta51<-delta51$xi.best
+des.delta52<-delta52$xi.best
+
+
+des.delta6<-delta6$xi.best
+des.delta61<-delta61$xi.best
+des.delta62<-delta62$xi.best
+
+des.delta7<-delta7$xi.best
+des.delta71<-delta71$xi.best
+des.delta72<-delta72$xi.best
+
+des.delta1
+
+des.delta2
+des.delta21
+des.delta22
+
+des.delta3
+des.delta31
+des.delta32
+
+des.delta4
+des.delta41
+des.delta42
+
+des.delta5
+des.delta51
+des.delta52
+
+des.delta6
+des.delta61
+des.delta62
+
+des.delta7
+des.delta71
+des.delta72
+
+
+
+
+
+
+
+
+
+
+
+
+
+des.plot=function(design.best){
+  plot(design.best[, 1], design.best[, 2], type = "n",xlab="x1",ylab="x2",xlim=c(0,30),ylim=c(0,60)); grid()
+  points(design.best[as.logical(design.best[, 3]), 1], design.best[as.logical(design.best[, 3]), 2], pch = 19, 
+         cex = sqrt(design.best[, 3][as.logical(design.best[, 3])]))
+}
+par(mfrow=c(1,4))
+
+des.plot(delta1$design.best)
+title(main=expression(delta[1]~","~delta[2]~",...,"~delta[5*c]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta6$design.best)
+title(main=expression(delta[10*a]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta61$design.best)
+title(main=expression(delta[10*b]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta62$design.best)
+title(main=expression(delta[10*c]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta7$design.best)
+title(main=expression(delta[15*a]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta71$design.best)
+title(main=expression(delta[15*b]), adj = 0.5,cex.main=1.4)
+
+
+des.plot(delta72$design.best)
+title(main=expression(delta[15*c]), adj = 0.5,cex.main=1.4)
+
