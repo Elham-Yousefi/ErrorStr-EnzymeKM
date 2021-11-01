@@ -20,8 +20,7 @@ x1 <- c(epsilon,1:30)
 x2 <- 0:60
 XE2 <- expand.grid(x1,x2)
 
-## This is only a shit code
-
+## shit is not a good word man
 
 ##################################################################################################################
 od_delta_KL_Example2 <- function(th0, th0l, th0u, th1, th1l, th1u, X, n, t.max=60) {
