@@ -31,7 +31,7 @@ lambdanc=0   # lambdanc=0, competitive model is fitted
 
 
 
-#Maximum number of algorithm iterations
+#Maximum number of algo. iterations
 max.iter=20000
 efficiency <- numeric(max.iter)
 
