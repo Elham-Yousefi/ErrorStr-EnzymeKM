@@ -1,18 +1,16 @@
 rm(list=ls())
 
-#initial parameter values (log case)
+#parameter values (log case)
+theta1nc=c(12.0125, 8.5359, 5.6638,0) 
 
-theta1nc=c(12.0125, 8.5359, 5.6638,0) #kappa=0, non competitive fixed
-
-MEANTH.HATC<-c(7.493416, 4.648123, 2.918526) # estimates derived from minimization of delta_0 in T-optimum designs
-lambdac=1   # lambda=1, competitive fitted
-
+MEANTH.HATC<-c(8.025290, 5.520947, 3.575972) # estimates derived from the minimization procedure in Toptim_A1_log
+lambdac=1   
 
 
-theta1c=c(6.0645, 3.2799, 3.3153,1) #kappa=1, competitive fixed
+theta1c=c(6.0645, 3.2799, 3.3153,1) 
 
-MEANTH.HATNC<-c(11.74402, 11.39266, 8.876286) # estimates derived from minimization of delta_1 in T-optimum designs
-lambdanc=0   # lambda=0, non-competitive fitted
+MEANTH.HATNC<-c(14.34820, 13.86322, 8.715987) # estimates derived from the minimization procedure in Toptim_A4_log
+lambdanc=0   
 
 
 #--------------------------------------------------------------------------------------------------------------
@@ -31,18 +29,17 @@ wt3<-c(0.1634,0.2189,0.2811,0.3366)
 dest4<-matrix(c(0.02,0,30.00,0,0.02,60,30.00,60),nrow=4,byrow=TRUE)
 wt4<-c(0.2500,0.2502,0.2500,0.2498)
 #--------------------------------------------------------------------------------------------------------------
+#delta_0 (lack of fit sum of squares of the optimum designs, when the non competitive log model is fixed)
 
-#delta_0 (lack of fit sum of squares when the non competitive model is fixed)
-
-DELTA0=function(TETA,XXX1,XXX2,WW){   #kappa=0
+DELTA0=function(TETA,XXX1,XXX2,WW){   
   ETA10=log((theta1nc[1]*XXX1)/((theta1nc[2]*(1+(XXX2/theta1nc[3])))+(XXX1*(1+((XXX2*(1-theta1nc[4]))/theta1nc[3])))))
   ETA20=log((TETA[1]*XXX1)/((TETA[2]*(1+(XXX2/TETA[3])))+(XXX1*(1+((XXX2*(1-lambdac))/TETA[3])))))
   sum(WW*((ETA10-ETA20)^2))
 }
 
 
-#delta_1 (lack of fit sum of squares when the competitive model is fixed)
-DELTA1=function(TETA,XX1,XX2,WW){   #kappa=1
+#delta_1 (lack of fit sum of squares of the optimum designs, when the competitive log model is fixed)
+DELTA1=function(TETA,XX1,XX2,WW){   
   ETA11=log((theta1c[1]*XX1)/((theta1c[2]*(1+(XX2/theta1c[3])))+(XX1*(1+((XX2*(1-theta1c[4]))/theta1c[3])))))
   ETA21=log((TETA[1]*XX1)/((TETA[2]*(1+(XX2/TETA[3])))+(XX1*(1+((XX2*(1-lambdanc))/TETA[3])))))
   sum(WW*((ETA11-ETA21)^2))
@@ -50,7 +47,6 @@ DELTA1=function(TETA,XX1,XX2,WW){   #kappa=1
 
 #--------------------------------------------------------------------------------------------------------------
 #T_efficiency formulation
-
 Teff<-function(d1,d2){
   round((d1/d2)*100, 2)
 }
@@ -79,4 +75,3 @@ TEF1<-c(Tef21,Tef31,Tef41,Tef11)
 
 TEF<-cbind(TEF0,TEF1)
 TEF
-

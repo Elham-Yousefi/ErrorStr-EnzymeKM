@@ -1,18 +1,17 @@
 rm(list=ls())
 
-#initial parameter values (standard case)
+#parameter values (standard case)
+theta1nc=c(8.6957,8.0664,12.0566,0) 
 
-theta1nc=c(8.6957,8.0664,12.0566,0) #kappa=0, non competitive fixed
-
-THETAHATC<-c(8.680591, 8.0018861, 3.24841556) # estimates derived from minimization of delta_0 in T-optimum designs
-lambdac=1   # lambda=1, competitive fitted
-
+THETAHATC<-c(8.680591, 8.0018861, 3.24841556) # estimates derived from the minimization procedure in Toptim_nu0_standard
+lambdac=1   
 
 
-theta1c=c(7.2976,4.3860,2.5821,1) #kappa=1, competitive fixed
 
-THETAHATNC<-c(6.193258,  0.001000,  9.099974) # estimates derived from minimization of delta_1 in T-optimum designs
-lambdanc=0   # lambda=0, non-competitive fitted
+theta1c=c(7.2976,4.3860,2.5821,1) 
+
+THETAHATNC<-c(6.193258,  0.001000,  9.099974) # estimates derived from the minimization procedure in Toptim_nu1_standard
+lambdanc=0   
 
 
 #--------------------------------------------------------------------------------------------------------------

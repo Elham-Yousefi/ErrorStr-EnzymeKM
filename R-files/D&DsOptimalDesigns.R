@@ -1,3 +1,5 @@
+# D and Ds optimal designs (Table 3)
+
 rm(list=ls())
 library(OptimalDesign)
 library(numDeriv)
@@ -9,8 +11,6 @@ priortheta.nc=c(8.6957,8.0664,12.0566,0) # lambda=0, prior par. values for non c
 priortheta.c=c(7.2976,4.3860,2.5821,1)   # lambda=1, prior par. values for competitive model
 priortheta.ds.comb=c(7.4253,4.6808,3.0581,0.9636)  # prior par. values for encompassing model
 
-p=4 # total number of parameters for encompassing model
-s=1 # number of parameters of interest in D-s optimal designs
 
 # design space (standard case)
 x1=seq(0,30,length=225)
@@ -233,7 +233,7 @@ Dopt.4logcombd
 #-------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------
-#robustness check of D-optimal designs (for the encompassing) [NOT presented in the paper]
+#robustness check of D-optimal designs w.r.t par. prior values (for the encompassing) [NOT presented in the paper]
 #all the designs are the same on the corners as before
 # while the prior values could be any values from the uniform distribution
 
@@ -275,7 +275,7 @@ Ds.logcomb.fun=function(prior){
 
 Ds.logcomb.fun(priortheta.ds.logcomb8)
 #-------------------------------------------------------------------------------------------------
-# Robustness check of Ds optimum design (for the encompassing) [NOT presented in the paper] 
+# Robustness check of Ds optimum design w.r.t par. prior values (for the encompassing) [NOT presented in the paper] 
 # shows that the support points remain the same
 # while the optimum weights do not
 Ds.logcomb.fun(c(runif(3, min = 0, max = 60),runif(1,min=0,max=1)))

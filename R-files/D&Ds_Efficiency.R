@@ -1,15 +1,20 @@
+# thorough comparison of D and Ds optimal designs using D and Ds efficiency (Table 4)
+
 rm(list=ls())
 library(numDeriv)
 
-#initial parameter values resulted using 120 real data (Tables 1 & 2)
-priortheta.nc=c(8.6957,8.0664,12.0566,0) # lambda=0, non competitive model
-priortheta.c=c(7.2976,4.3860,2.5821,1)  # lambda=1, competitive model
-priortheta.ds.comb=c(7.4253,4.6808,3.0581,0.9636)  # prior values for combined model
 
+#prior parameter values resulted using 120 real data (Tables 1 & 2)
 
-priortheta.lognc=c(12.0125, 8.5359, 5.6638,0) # lambda=0, non competitive log model
-priortheta.logc=c(6.0645, 3.2799, 3.3153,1)  # lambda=1, competitive log model
-priortheta.ds.logcomb8=c(6.9897, 3.9799, 3.7380 , 0.8737) #prior values for combined log model
+#prior values in the standard case
+priortheta.nc=c(8.6957,8.0664,12.0566,0) 
+priortheta.c=c(7.2976,4.3860,2.5821,1)  
+priortheta.ds.comb=c(7.4253,4.6808,3.0581,0.9636)  
+
+#prior values in the log case
+priortheta.lognc=c(12.0125, 8.5359, 5.6638,0) 
+priortheta.logc=c(6.0645, 3.2799, 3.3153,1)  
+priortheta.ds.logcomb8=c(6.9897, 3.9799, 3.7380 , 0.8737) 
 
 #--------------------------------------------------------------------------------------------------------------
 # encompassing model as a function of parameters and design points
